@@ -24,6 +24,66 @@ Supabase sera necessaire pour :
 - historique des actions ;
 - synchronisation PC / iPhone.
 
+## Etat actuel
+
+Ton URL Cloudflare actuelle :
+
+```txt
+https://plantcare.cyril-hannier.workers.dev/
+```
+
+Si cette URL affiche le site, la partie PWA est deja hebergee. Il reste a brancher la base Supabase pour avoir les comptes et les donnees synchronisees.
+
+## Brancher Supabase
+
+1. Ouvrir le projet Supabase.
+2. Aller dans `SQL Editor`.
+3. Coller le contenu de `supabase/schema.sql`.
+4. Executer le script.
+5. Aller dans `Project Settings` puis `API`.
+6. Copier :
+   - `Project URL`
+   - `anon public` ou `publishable key`
+7. Les coller dans `src/supabase-config.js`.
+
+Ne jamais coller la `service_role key` dans le code frontend.
+
+Exemple :
+
+```js
+export const supabaseConfig = {
+  url: "https://xxxx.supabase.co",
+  publishableKey: "eyJ..."
+};
+```
+
+## Authentification
+
+Le client Supabase est pret dans :
+
+```txt
+src/supabase-client.js
+src/supabase-repository.js
+```
+
+Il utilise le client JavaScript officiel via CDN. La documentation Supabase indique que `createClient` prend l'URL Supabase et la cle fournie par le dashboard.
+
+## Photos
+
+Le script SQL cree un bucket prive :
+
+```txt
+plant-photos
+```
+
+Les chemins des photos sont stockes dans :
+
+```txt
+plant_photos.storage_path
+```
+
+Pour la suite, il faudra compresser les photos avant upload et generer une miniature afin de rester dans les limites gratuites.
+
 ## Deploiement Vercel
 
 1. Creer un depot GitHub avec ce dossier.
