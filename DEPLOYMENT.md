@@ -68,6 +68,13 @@ src/supabase-repository.js
 
 Il utilise le client JavaScript officiel via CDN. La documentation Supabase indique que `createClient` prend l'URL Supabase et la cle fournie par le dashboard.
 
+Dans Supabase, aller dans `Authentication` -> `URL Configuration` :
+
+- `Site URL` : `https://plantcare.cyril-hannier.workers.dev`
+- `Redirect URLs` : ajouter `https://plantcare.cyril-hannier.workers.dev/**`
+
+Sans ce reglage, les emails de confirmation peuvent renvoyer vers l'URL par defaut du projet, par exemple `http://localhost:3000`.
+
 ## Photos
 
 Le script SQL cree un bucket prive :

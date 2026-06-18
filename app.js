@@ -6,7 +6,7 @@ import {
   getWateringMetrics,
   getWeatherRisk
 } from "./src/engines.js?v=3";
-import { isSupabaseConfigured } from "./src/supabase-config.js?v=6";
+import { isSupabaseConfigured } from "./src/supabase-config.js?v=7";
 import {
   deletePlant as deleteRemotePlant,
   ensureDefaultGarden,
@@ -20,7 +20,7 @@ import {
   signUpWithPassword,
   uploadPlantPhoto,
   upsertPlant
-} from "./src/supabase-repository.js?v=6";
+} from "./src/supabase-repository.js?v=7";
 
 const STORAGE_KEY = "plantcare.plants.v2";
 const LEGACY_STORAGE_KEY = "plantcare.plants.v1";

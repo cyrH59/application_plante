@@ -1,4 +1,4 @@
-import { getSupabaseClient } from "./supabase-client.js?v=6";
+import { getSupabaseClient } from "./supabase-client.js?v=7";
 
 export async function getCurrentUser() {
   const supabase = await getSupabaseClient();
@@ -33,9 +33,20 @@ export async function signUpWithPassword(email, password) {
   const supabase = await getSupabaseClient();
   if (!supabase) throw new Error("Supabase n'est pas configure.");
 
-  const { data, error } = await supabase.auth.signUp({ email, password });
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: getAuthRedirectUrl()
+    }
+  });
   if (error) throw error;
   return data;
+}
+
+function getAuthRedirectUrl() {
+  if (typeof window === "undefined") return undefined;
+  return window.location.origin;
 }
 
 export async function listGardens() {
