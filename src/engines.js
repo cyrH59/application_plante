@@ -19,7 +19,9 @@ export function getWateringMetrics(plant, weather, now = Date.now()) {
   const lastWateredAt = plant.lastWateredAt || plant.createdAt || now;
   const days = daysBetween(lastWateredAt, now);
   const heatLoss = weather ? Math.max(0, ((weather.temperatureMax24 ?? weather.temperature ?? 20) - 24) * rule.heatLossFactor) : 0;
-  const dailyLoss = rule.dailyLossPercent + heatLoss;
+  const coldSlowdown = weather ? Math.max(0, (12 - (weather.temperature ?? 18)) * (rule.coldSlowdownFactor || 0.08)) : 0;
+  const seasonalFactor = rule.seasonalFactors?.[getCurrentSeason(new Date(now))] ?? 1;
+  const dailyLoss = Math.max(0.5, (rule.dailyLossPercent + heatLoss - coldSlowdown) * seasonalFactor);
   const rainGain = getRainGain(plant, weather, rule);
   const value = clamp(baseLevel - days * dailyLoss + rainGain, 0, 100);
   const state = getGaugeState(value, rule.alertThresholds);
@@ -29,6 +31,7 @@ export function getWateringMetrics(plant, weather, now = Date.now()) {
     state,
     daysSinceWater: Math.round(days),
     dailyLoss: round1(dailyLoss),
+    seasonalFactor,
     rainGain,
     thresholds: rule.alertThresholds
   };
@@ -136,6 +139,7 @@ function mergeWateringRule(baseRule, override = {}) {
     ...baseRule,
     ...override,
     alertThresholds: { ...baseRule.alertThresholds, ...(override.alertThresholds || {}) },
+    seasonalFactors: { ...baseRule.seasonalFactors, ...(override.seasonalFactors || {}) },
     rainGain: { ...baseRule.rainGain, ...(override.rainGain || {}) }
   };
 }

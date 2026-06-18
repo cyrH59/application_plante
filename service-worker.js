@@ -1,4 +1,4 @@
-const CACHE_NAME = "plantcare-v7";
+const CACHE_NAME = "plantcare-v9";
 const APP_ASSETS = [
   "./",
   "./index.html",
@@ -8,6 +8,8 @@ const APP_ASSETS = [
   "./styles.css?v=4",
   "./styles.css?v=5",
   "./styles.css?v=6",
+  "./styles.css?v=8",
+  "./styles.css?v=9",
   "./app.js",
   "./app.js?v=2",
   "./app.js?v=3",
@@ -15,22 +17,28 @@ const APP_ASSETS = [
   "./app.js?v=5",
   "./app.js?v=6",
   "./app.js?v=7",
+  "./app.js?v=8",
   "./src/config.js",
   "./src/config.js?v=3",
+  "./src/config.js?v=8",
   "./src/engines.js",
   "./src/engines.js?v=3",
+  "./src/engines.js?v=8",
   "./src/supabase-config.js",
   "./src/supabase-config.js?v=5",
   "./src/supabase-config.js?v=6",
   "./src/supabase-config.js?v=7",
+  "./src/supabase-config.js?v=8",
   "./src/supabase-client.js",
   "./src/supabase-client.js?v=5",
   "./src/supabase-client.js?v=6",
   "./src/supabase-client.js?v=7",
+  "./src/supabase-client.js?v=8",
   "./src/supabase-repository.js",
   "./src/supabase-repository.js?v=5",
   "./src/supabase-repository.js?v=6",
   "./src/supabase-repository.js?v=7",
+  "./src/supabase-repository.js?v=8",
   "./manifest.webmanifest",
   "./icon.svg"
 ];

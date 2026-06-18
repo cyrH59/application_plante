@@ -1,12 +1,12 @@
-import { broadCategories, exposureLabels, plantProfiles } from "./src/config.js?v=3";
+import { broadCategories, exposureLabels, plantProfiles } from "./src/config.js?v=8";
 import {
   getCurrentSeason,
   getExposureMetrics,
   getFertilizationMetrics,
   getWateringMetrics,
   getWeatherRisk
-} from "./src/engines.js?v=3";
-import { isSupabaseConfigured } from "./src/supabase-config.js?v=7";
+} from "./src/engines.js?v=8";
+import { isSupabaseConfigured } from "./src/supabase-config.js?v=8";
 import {
   deletePlant as deleteRemotePlant,
   ensureDefaultGarden,
@@ -20,7 +20,7 @@ import {
   signUpWithPassword,
   uploadPlantPhoto,
   upsertPlant
-} from "./src/supabase-repository.js?v=7";
+} from "./src/supabase-repository.js?v=8";
 
 const STORAGE_KEY = "plantcare.plants.v2";
 const LEGACY_STORAGE_KEY = "plantcare.plants.v1";
@@ -73,6 +73,10 @@ const dom = {
   plantPlacement: document.querySelector("#plantPlacement"),
   plantWaterLevel: document.querySelector("#plantWaterLevel"),
   waterLevelValue: document.querySelector("#waterLevelValue"),
+  dailyLossPercent: document.querySelector("#dailyLossPercent"),
+  heatLossFactor: document.querySelector("#heatLossFactor"),
+  moderateRainGain: document.querySelector("#moderateRainGain"),
+  heavyRainGain: document.querySelector("#heavyRainGain"),
   fertilizationMode: document.querySelector("#fertilizationMode"),
   manualFertilizationFields: document.querySelector("#manualFertilizationFields"),
   fertHiver: document.querySelector("#fertHiver"),
@@ -80,6 +84,9 @@ const dom = {
   fertEte: document.querySelector("#fertEte"),
   fertAutomne: document.querySelector("#fertAutomne"),
   plantNotes: document.querySelector("#plantNotes"),
+  cemeteryFields: document.querySelector("#cemeteryFields"),
+  cemeteryReason: document.querySelector("#cemeteryReason"),
+  cemeteryPlantBtn: document.querySelector("#cemeteryPlantBtn"),
   deletePlantBtn: document.querySelector("#deletePlantBtn"),
   backupBtn: document.querySelector("#backupBtn"),
   importInput: document.querySelector("#importInput"),
@@ -105,12 +112,14 @@ function registerEvents() {
   dom.openPlantFormBtn.addEventListener("click", () => openForm());
   dom.closeDialogBtn.addEventListener("click", closeForm);
   dom.plantForm.addEventListener("submit", savePlantFromForm);
+  dom.cemeteryPlantBtn.addEventListener("click", moveCurrentPlantToCemetery);
   dom.deletePlantBtn.addEventListener("click", deleteCurrentPlant);
   dom.backupBtn.addEventListener("click", exportData);
   dom.importInput.addEventListener("change", importData);
   dom.installBtn.addEventListener("click", installApp);
   dom.plantWaterLevel.addEventListener("input", updateWaterLevelLabel);
   dom.plantHealthScore.addEventListener("input", updateHealthScoreLabel);
+  dom.plantProfile.addEventListener("change", () => setWateringOverrideFields(null));
   dom.fertilizationMode.addEventListener("change", syncManualFertilizationVisibility);
   dom.accountForm.addEventListener("submit", handleSignIn);
   dom.signUpBtn.addEventListener("click", handleSignUp);
@@ -155,6 +164,7 @@ function loadPlants() {
 
 function normalizePlant(plant) {
   const profile = plantProfiles[plant.profile] ? plant.profile : "standard";
+  const photos = Array.isArray(plant.photos) ? plant.photos : [];
   return {
     id: plant.id || crypto.randomUUID(),
     name: plant.name || "Plante sans nom",
@@ -164,6 +174,7 @@ function normalizePlant(plant) {
     placement: plant.placement || "inside",
     notes: plant.notes || "",
     photo: plant.photo || "",
+    photos,
     createdAt: plant.createdAt || Date.now(),
     lastWateredAt: plant.lastWateredAt || plant.createdAt || Date.now(),
     waterLevel: Number.isFinite(plant.waterLevel) ? plant.waterLevel : 100,
@@ -234,16 +245,28 @@ function renderWeather() {
   const risk = getWeatherRisk(weather);
   const updated = new Date(weather.updatedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
   const riskText = risk.items.length ? risk.items.join(", ") : "Risque faible";
+  const maxRain = Math.max(weather.rain24 || 0, weather.rain3d || 0, weather.rain7d || 0, 1);
 
   dom.weatherSummary.textContent = `${weather.temperatureMin7} / ${weather.temperatureMax7} °C · risque ${risk.score}/10 · ${riskText}`;
   dom.weatherDetails.innerHTML = `
-    <span>24h: ${weather.rain24} mm</span>
-    <span>3j: ${weather.rain3d} mm</span>
-    <span>7j: ${weather.rain7d} mm</span>
-    <span class="risk-pill ${risk.level}">${risk.score}/10</span>
-    <span>Maj ${updated}</span>
+    ${renderRainStat("24h", weather.rain24, maxRain)}
+    ${renderRainStat("3j", weather.rain3d, maxRain)}
+    ${renderRainStat("7j", weather.rain7d, maxRain)}
+    <span class="risk-pill ${risk.level}">Risque ${risk.score}/10</span>
+    <span>Station locale · Maj ${updated}</span>
   `;
   dom.locationBtn.textContent = "Rafraichir";
+}
+
+function renderRainStat(label, value, maxRain) {
+  const width = Math.max(6, Math.round((Number(value || 0) / maxRain) * 100));
+  return `
+    <span class="rain-stat">
+      <b>${label}</b>
+      <i><em style="width:${width}%"></em></i>
+      <strong>${value} mm</strong>
+    </span>
+  `;
 }
 
 function renderStatus() {
@@ -272,7 +295,11 @@ function renderStatus() {
 }
 
 function renderPlants() {
-  const visiblePlants = plants.filter((plant) => plant.status !== "cemetery" && (activeFilter === "all" || plant.category === activeFilter));
+  const visiblePlants = plants.filter((plant) =>
+    activeFilter === "cemetery"
+      ? plant.status === "cemetery"
+      : plant.status !== "cemetery" && (activeFilter === "all" || plant.category === activeFilter)
+  );
   dom.plantList.innerHTML = "";
 
   if (visiblePlants.length === 0) {
@@ -297,6 +324,7 @@ function renderPlants() {
       card.querySelector(".plant-name").textContent = plant.name;
       card.querySelector(".plant-category").textContent = `${broadCategories[plant.category]} · ${profile.label}`;
       card.querySelector(".plant-hint").textContent = getHint(plant, water, fertilizer, exposure);
+      card.querySelector(".plant-meta").textContent = getPlantMeta(plant, water);
 
       const alert = card.querySelector(".plant-alert");
       const mainState = water.state === "danger" || fertilizer.state === "danger" ? "danger" : water.state === "warn" || fertilizer.state === "warn" ? "warn" : "ok";
@@ -318,6 +346,9 @@ function renderPlants() {
       card.querySelector(".water-button").addEventListener("click", () => waterPlant(plant.id));
       card.querySelector(".feed-button").addEventListener("click", () => feedPlant(plant.id));
       card.querySelector(".card-edit").addEventListener("click", () => openForm(plant));
+      const quickPhotoInput = card.querySelector(".quick-photo-input");
+      card.querySelector(".card-photo").addEventListener("click", () => quickPhotoInput.click());
+      quickPhotoInput.addEventListener("change", (event) => addQuickPhoto(plant.id, event.target.files[0]));
 
       dom.plantList.append(card);
     });
@@ -330,6 +361,7 @@ function getAlertLabel(state) {
 }
 
 function getHint(plant, water, fertilizer, exposure) {
+  if (plant.status === "cemetery") return plant.cemeteryReason ? `Archive: ${plant.cemeteryReason}` : "Archive conservee avec sa photo principale.";
   if ((plant.healthScore || 7) <= 3) return `Sante ${plant.healthScore}/10: plante a surveiller de pres.`;
   if (water.state === "danger") return `Eau basse: ${water.value}%. Dernier arrosage il y a ${water.daysSinceWater} j.`;
   if (fertilizer.state === "danger") return `Fertilisation en retard de ${fertilizer.overdueDays} j.`;
@@ -337,6 +369,13 @@ function getHint(plant, water, fertilizer, exposure) {
   if (exposure.state === "danger") return "Exposition peu adaptee: verifie l'emplacement de cette plante.";
   if (fertilizer.state === "paused") return `Fertilisation en pause pour la saison ${fertilizer.season}.`;
   return `Perte eau estimee: ${water.dailyLoss}%/j · fertilisation: ${fertilizer.label}.`;
+}
+
+function getPlantMeta(plant, water) {
+  const parts = [`Sante ${plant.healthScore || 7}/10`, `Perte ${water.dailyLoss}%/j`];
+  if (plant.birthDate) parts.unshift(`Nee le ${new Date(plant.birthDate).toLocaleDateString("fr-FR")}`);
+  if (plant.photos?.length) parts.push(`${plant.photos.length} photo${plant.photos.length > 1 ? "s" : ""}`);
+  return parts.join(" · ");
 }
 
 function setGauge(card, kind, value, state, label = `${value}%`) {
@@ -362,10 +401,14 @@ function openForm(plant = null) {
   dom.plantId.value = plant?.id || "";
   dom.dialogTitle.textContent = plant ? "Modifier la plante" : "Ajouter une plante";
   dom.deletePlantBtn.hidden = !plant;
+  dom.cemeteryPlantBtn.hidden = !plant || plant.status === "cemetery";
+  dom.cemeteryFields.hidden = !plant || plant.status !== "cemetery";
+  dom.cemeteryReason.value = plant?.cemeteryReason || "";
   dom.plantWaterLevel.value = currentWater;
   updateWaterLevelLabel();
   dom.plantHealthScore.value = plant?.healthScore || 7;
   updateHealthScoreLabel();
+  setWateringOverrideFields(plant);
 
   if (plant) {
     dom.plantName.value = plant.name;
@@ -405,11 +448,14 @@ async function savePlantFromForm(event) {
     placement: dom.plantPlacement.value,
     notes: dom.plantNotes.value.trim(),
     photo: localPhoto,
+    photos: photoFile
+      ? [{ localUrl: localPhoto, taken_at: new Date().toISOString().slice(0, 10), is_primary: true }, ...(existing?.photos || [])]
+      : existing?.photos || [],
     birthDate: dom.plantBirthDate.value || null,
     healthScore: Number(dom.plantHealthScore.value || 7),
     status: existing?.status || "active",
     cemeteryDate: existing?.cemeteryDate || null,
-    cemeteryReason: existing?.cemeteryReason || null,
+    cemeteryReason: dom.cemeteryReason.value.trim() || existing?.cemeteryReason || null,
     createdAt: existing?.createdAt || now,
     lastWateredAt: now,
     waterLevel,
@@ -418,7 +464,7 @@ async function savePlantFromForm(event) {
       mode: dom.fertilizationMode.value,
       manualSchedule: getManualFertilizationFromForm()
     },
-    wateringOverride: existing?.wateringOverride || null
+    wateringOverride: getWateringOverrideFromForm()
   };
 
   try {
@@ -464,6 +510,71 @@ async function deleteCurrentPlant() {
     render();
   } catch (error) {
     alert(`Suppression impossible: ${error.message}`);
+  }
+}
+
+async function moveCurrentPlantToCemetery() {
+  const id = dom.plantId.value;
+  if (!id) return;
+
+  const reason = prompt("Pourquoi mettre cette plante au cimetiere ?", dom.cemeteryReason.value || "");
+  plants = plants.map((plant) =>
+    plant.id === id
+      ? {
+          ...plant,
+          status: "cemetery",
+          cemeteryDate: new Date().toISOString().slice(0, 10),
+          cemeteryReason: reason || "",
+          photos: plant.photo ? [{ localUrl: plant.photo, taken_at: new Date().toISOString().slice(0, 10), is_primary: true }] : []
+        }
+      : plant
+  );
+  savePlants();
+
+  const plant = plants.find((item) => item.id === id);
+  if (currentGarden && plant) {
+    try {
+      await upsertPlant(currentGarden.id, plant);
+      await logPlantAction(id, "cemetery", { reason: plant.cemeteryReason });
+      await loadRemoteData();
+    } catch (error) {
+      setSyncMessage(`Cimetiere local uniquement: ${error.message}`);
+    }
+  }
+
+  closeForm();
+  render();
+}
+
+async function addQuickPhoto(id, file) {
+  if (!file) return;
+
+  const localPhoto = await fileToDataUrl(file);
+  const takenAt = new Date().toISOString().slice(0, 10);
+  plants = plants.map((plant) =>
+    plant.id === id
+      ? {
+          ...plant,
+          photo: localPhoto,
+          photos: [{ localUrl: localPhoto, taken_at: takenAt, is_primary: true }, ...(plant.photos || [])]
+        }
+      : plant
+  );
+  savePlants();
+  render();
+
+  if (!currentGarden) return;
+
+  try {
+    const photoRow = await uploadPlantPhoto({ plantId: id, file, takenAt, caption: "Nouvelle photo" });
+    const plant = plants.find((item) => item.id === id);
+    if (plant) await upsertPlant(currentGarden.id, plant);
+    await logPlantAction(id, "photo", { photoId: photoRow.id });
+    await loadRemoteData();
+    setSyncMessage("Photo ajoutee et synchronisee.");
+    render();
+  } catch (error) {
+    setSyncMessage(`Photo gardee localement: ${error.message}`);
   }
 }
 
@@ -754,6 +865,30 @@ function setManualFertilizationFields(schedule) {
   dom.fertPrintemps.value = schedule.printemps?.frequencyPerMonth ?? schedule.printemps ?? 1;
   dom.fertEte.value = schedule.ete?.frequencyPerMonth ?? schedule.ete ?? 1;
   dom.fertAutomne.value = schedule.automne?.frequencyPerMonth ?? schedule.automne ?? 0.5;
+}
+
+function setWateringOverrideFields(plant) {
+  const selectedProfile = plant?.profile || dom.plantProfile.value || "standard";
+  const profile = plantProfiles[selectedProfile] || plantProfiles.standard;
+  const override = plant?.wateringOverride || {};
+  const rule = { ...profile.watering, ...override };
+  const rainGain = { ...profile.watering.rainGain, ...(override.rainGain || {}) };
+
+  dom.dailyLossPercent.value = rule.dailyLossPercent;
+  dom.heatLossFactor.value = rule.heatLossFactor;
+  dom.moderateRainGain.value = rainGain.moderee;
+  dom.heavyRainGain.value = rainGain.forte;
+}
+
+function getWateringOverrideFromForm() {
+  return {
+    dailyLossPercent: Number(dom.dailyLossPercent.value || 6),
+    heatLossFactor: Number(dom.heatLossFactor.value || 0),
+    rainGain: {
+      moderee: Number(dom.moderateRainGain.value || 0),
+      forte: Number(dom.heavyRainGain.value || 0)
+    }
+  };
 }
 
 function getDefaultManualFertilization() {

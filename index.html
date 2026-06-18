@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>PlantCare</title>
     <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=6" />
+    <link rel="stylesheet" href="./styles.css?v=9" />
   </head>
   <body>
     <div class="app-shell">
@@ -56,6 +56,7 @@
           <button class="chip" data-filter="exterieur" type="button">Exterieur</button>
           <button class="chip" data-filter="legume" type="button">Legumes</button>
           <button class="chip" data-filter="fruitier" type="button">Fruitiers</button>
+          <button class="chip" data-filter="cemetery" type="button">Cimetiere</button>
         </section>
 
         <section class="plant-list" id="plantList" aria-label="Liste des plantes"></section>
@@ -160,6 +161,34 @@
             <input id="plantWaterLevel" name="waterLevel" type="range" min="0" max="100" step="1" />
             <span class="range-value" id="waterLevelValue">100%</span>
           </label>
+          <div class="form-grid">
+            <label>
+              Perte par jour
+              <input id="dailyLossPercent" type="number" min="0.5" max="30" step="0.5" />
+            </label>
+            <label>
+              Sensibilite chaleur
+              <input id="heatLossFactor" type="number" min="0" max="2" step="0.05" />
+            </label>
+          </div>
+          <div class="form-grid">
+            <label>
+              Pluie moderee
+              <input id="moderateRainGain" type="number" min="0" max="60" step="1" />
+            </label>
+            <label>
+              Forte pluie
+              <input id="heavyRainGain" type="number" min="0" max="80" step="1" />
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset id="cemeteryFields" hidden>
+          <legend>Cimetiere</legend>
+          <label>
+            Raison
+            <textarea id="cemeteryReason" rows="2" placeholder="Gel, oubli, maladie..."></textarea>
+          </label>
         </fieldset>
 
         <fieldset>
@@ -198,6 +227,7 @@
         </label>
 
         <div class="dialog-actions">
+          <button class="danger-button" id="cemeteryPlantBtn" type="button" hidden>Mettre au cimetiere</button>
           <button class="danger-button" id="deletePlantBtn" type="button" hidden>Supprimer</button>
           <button class="primary-action" type="submit">Enregistrer</button>
         </div>
@@ -207,6 +237,8 @@
     <template id="plantCardTemplate">
       <article class="plant-card">
         <button class="card-edit" type="button" aria-label="Modifier">Modifier</button>
+        <button class="card-photo" type="button" aria-label="Ajouter une photo">Photo</button>
+        <input class="quick-photo-input" type="file" accept="image/*" />
         <div class="plant-photo"></div>
         <div class="plant-content">
           <div class="plant-title-row">
@@ -235,6 +267,7 @@
           </div>
 
           <div class="exposure-note"></div>
+          <div class="plant-meta"></div>
           <p class="plant-hint"></p>
 
           <div class="quick-actions">
@@ -245,6 +278,6 @@
       </article>
     </template>
 
-    <script src="./app.js?v=6" type="module"></script>
+    <script src="./app.js?v=8" type="module"></script>
   </body>
 </html>

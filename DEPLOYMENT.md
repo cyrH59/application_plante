@@ -75,6 +75,14 @@ Dans Supabase, aller dans `Authentication` -> `URL Configuration` :
 
 Sans ce reglage, les emails de confirmation peuvent renvoyer vers l'URL par defaut du projet, par exemple `http://localhost:3000`.
 
+Si la connexion affiche une erreur RLS lors de la creation du jardin, executer aussi dans `SQL Editor` :
+
+```txt
+supabase/fix-garden-rls.sql
+```
+
+Cette fonction cree le jardin par defaut et son adhesion proprietaire dans une transaction cote Supabase.
+
 ## Photos
 
 Le script SQL cree un bucket prive :

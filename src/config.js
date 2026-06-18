@@ -43,6 +43,8 @@ export const plantProfiles = {
     watering: {
       dailyLossPercent: 3,
       heatLossFactor: 0.15,
+      coldSlowdownFactor: 0.08,
+      seasonalFactors: { hiver: 0.45, printemps: 0.85, ete: 1.15, automne: 0.7 },
       alertThresholds: { okAbove: 45, warningAbove: 20 },
       rainGain: { faible: 0, moderee: 3, forte: 8 }
     }
@@ -59,6 +61,8 @@ export const plantProfiles = {
     watering: {
       dailyLossPercent: 8,
       heatLossFactor: 0.38,
+      coldSlowdownFactor: 0.12,
+      seasonalFactors: { hiver: 0.55, printemps: 0.95, ete: 1.2, automne: 0.8 },
       alertThresholds: { okAbove: 55, warningAbove: 28 },
       rainGain: { faible: 0, moderee: 0, forte: 0 }
     }
@@ -75,6 +79,8 @@ export const plantProfiles = {
     watering: {
       dailyLossPercent: 6,
       heatLossFactor: 0.25,
+      coldSlowdownFactor: 0.1,
+      seasonalFactors: { hiver: 0.5, printemps: 0.9, ete: 1.18, automne: 0.75 },
       alertThresholds: { okAbove: 55, warningAbove: 25 },
       rainGain: { faible: 4, moderee: 10, forte: 18 }
     }
@@ -91,6 +97,8 @@ export const plantProfiles = {
     watering: {
       dailyLossPercent: 12,
       heatLossFactor: 0.5,
+      coldSlowdownFactor: 0.14,
+      seasonalFactors: { hiver: 0.35, printemps: 0.95, ete: 1.3, automne: 0.7 },
       alertThresholds: { okAbove: 60, warningAbove: 32 },
       rainGain: { faible: 5, moderee: 15, forte: 25 }
     }
@@ -107,6 +115,8 @@ export const plantProfiles = {
     watering: {
       dailyLossPercent: 7,
       heatLossFactor: 0.3,
+      coldSlowdownFactor: 0.1,
+      seasonalFactors: { hiver: 0.4, printemps: 0.9, ete: 1.18, automne: 0.75 },
       alertThresholds: { okAbove: 55, warningAbove: 25 },
       rainGain: { faible: 5, moderee: 15, forte: 25 }
     }

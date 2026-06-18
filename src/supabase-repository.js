@@ -1,4 +1,4 @@
-import { getSupabaseClient } from "./supabase-client.js?v=7";
+import { getSupabaseClient } from "./supabase-client.js?v=8";
 
 export async function getCurrentUser() {
   const supabase = await getSupabaseClient();
@@ -68,12 +68,12 @@ export async function ensureDefaultGarden() {
   const gardens = await listGardens();
   if (gardens.length > 0) return gardens[0];
 
-  const { data: garden, error: gardenError } = await supabase
-    .from("gardens")
-    .insert({ owner_id: user.id, name: "Mon jardin" })
-    .select()
-    .single();
+  const { data: rpcGarden, error: rpcError } = await supabase.rpc("create_default_garden");
+  if (!rpcError && rpcGarden) return Array.isArray(rpcGarden) ? rpcGarden[0] : rpcGarden;
+  if (rpcError && !String(rpcError.message || "").includes("Could not find the function")) throw rpcError;
 
+  const garden = { id: crypto.randomUUID(), owner_id: user.id, name: "Mon jardin" };
+  const { error: gardenError } = await supabase.from("gardens").insert(garden);
   if (gardenError) throw gardenError;
 
   const { error: memberError } = await supabase.from("garden_members").insert({
