@@ -1,0 +1,18 @@
+{
+  "name": "PlantCare",
+  "short_name": "PlantCare",
+  "description": "Gestion mobile des plantes avec jauges d'arrosage, fertilisation et meteo locale.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f5f2ea",
+  "theme_color": "#385c47",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

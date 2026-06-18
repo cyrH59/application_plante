@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#385c47" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="PlantCare" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>PlantCare</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="stylesheet" href="./styles.css?v=4" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Carnet botanique</p>
+          <h1>PlantCare</h1>
+        </div>
+        <button class="icon-button" id="installBtn" type="button" aria-label="Installer l'application" hidden>
+          <span aria-hidden="true">+</span>
+        </button>
+      </header>
+
+      <main>
+        <section class="weather-band" id="weatherBand">
+          <div>
+            <p class="label">Meteo locale</p>
+            <strong id="weatherSummary">Position a definir</strong>
+            <div class="weather-details" id="weatherDetails"></div>
+          </div>
+          <button class="ghost-button" id="locationBtn" type="button">Activer</button>
+        </section>
+
+        <section class="status-strip" id="statusStrip" aria-live="polite"></section>
+
+        <section class="toolbar" aria-label="Filtres">
+          <button class="chip active" data-filter="all" type="button">Toutes</button>
+          <button class="chip" data-filter="interieur" type="button">Interieur</button>
+          <button class="chip" data-filter="exterieur" type="button">Exterieur</button>
+          <button class="chip" data-filter="legume" type="button">Legumes</button>
+          <button class="chip" data-filter="fruitier" type="button">Fruitiers</button>
+        </section>
+
+        <section class="plant-list" id="plantList" aria-label="Liste des plantes"></section>
+      </main>
+
+      <nav class="bottom-nav" aria-label="Actions">
+        <button class="nav-action" id="backupBtn" type="button">
+          <span aria-hidden="true">v</span>
+          Export
+        </button>
+        <label class="nav-action file-action">
+          <span aria-hidden="true">^</span>
+          Import
+          <input id="importInput" type="file" accept="application/json" />
+        </label>
+        <button class="primary-action" id="openPlantFormBtn" type="button">Ajouter</button>
+      </nav>
+    </div>
+
+    <dialog class="plant-dialog" id="plantDialog">
+      <form class="plant-form" id="plantForm" method="dialog">
+        <div class="dialog-head">
+          <div>
+            <p class="eyebrow">Fiche plante</p>
+            <h2 id="dialogTitle">Ajouter une plante</h2>
+          </div>
+          <button class="icon-button muted" id="closeDialogBtn" type="button" aria-label="Fermer">x</button>
+        </div>
+
+        <input id="plantId" type="hidden" />
+
+        <label>
+          Nom
+          <input id="plantName" name="name" type="text" placeholder="Ficus, Tomate cerise..." required />
+        </label>
+
+        <label>
+          Photo
+          <input id="plantPhoto" name="photo" type="file" accept="image/*" />
+        </label>
+
+        <div class="form-grid">
+          <label>
+            Categorie
+            <select id="plantCategory" name="category">
+              <option value="interieur">Interieur</option>
+              <option value="exterieur">Exterieur</option>
+              <option value="legume">Legume</option>
+              <option value="fruitier">Arbre fruitier</option>
+            </select>
+          </label>
+
+          <label>
+            Profil d'entretien
+            <select id="plantProfile" name="profile">
+              <option value="tropical">Tropicale</option>
+              <option value="standard">Classique</option>
+              <option value="succulent">Cactus / succulente</option>
+              <option value="potager">Potager gourmand</option>
+              <option value="fruitier">Fruitier</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="form-grid">
+          <label>
+            Exposition actuelle
+            <select id="plantLight" name="light">
+              <option value="shade">Ombre</option>
+              <option value="partial">Mi-ombre</option>
+              <option value="sun">Soleil</option>
+            </select>
+          </label>
+
+          <label>
+            Installation
+            <select id="plantPlacement" name="placement">
+              <option value="inside">Interieur</option>
+              <option value="pot">Pot dehors</option>
+              <option value="ground">Pleine terre</option>
+            </select>
+          </label>
+        </div>
+
+        <fieldset>
+          <legend>Arrosage</legend>
+          <label>
+            Niveau actuel
+            <input id="plantWaterLevel" name="waterLevel" type="range" min="0" max="100" step="1" />
+            <span class="range-value" id="waterLevelValue">100%</span>
+          </label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Fertilisation</legend>
+          <label>
+            Mode
+            <select id="fertilizationMode" name="fertilizationMode">
+              <option value="auto">Automatique selon le profil</option>
+              <option value="manual">Manuel par saison</option>
+            </select>
+          </label>
+
+          <div class="season-grid" id="manualFertilizationFields">
+            <label>
+              Hiver
+              <input id="fertHiver" type="number" min="0" max="4" step="0.5" value="0" />
+            </label>
+            <label>
+              Printemps
+              <input id="fertPrintemps" type="number" min="0" max="4" step="0.5" value="1" />
+            </label>
+            <label>
+              Ete
+              <input id="fertEte" type="number" min="0" max="4" step="0.5" value="1" />
+            </label>
+            <label>
+              Automne
+              <input id="fertAutomne" type="number" min="0" max="4" step="0.5" value="0.5" />
+            </label>
+          </div>
+        </fieldset>
+
+        <label>
+          Notes
+          <textarea id="plantNotes" name="notes" rows="3" placeholder="Substrat, emplacement, observation..."></textarea>
+        </label>
+
+        <div class="dialog-actions">
+          <button class="danger-button" id="deletePlantBtn" type="button" hidden>Supprimer</button>
+          <button class="primary-action" type="submit">Enregistrer</button>
+        </div>
+      </form>
+    </dialog>
+
+    <template id="plantCardTemplate">
+      <article class="plant-card">
+        <button class="card-edit" type="button" aria-label="Modifier">Modifier</button>
+        <div class="plant-photo"></div>
+        <div class="plant-content">
+          <div class="plant-title-row">
+            <div>
+              <p class="plant-category"></p>
+              <h2 class="plant-name"></h2>
+            </div>
+            <span class="plant-alert"></span>
+          </div>
+
+          <div class="gauge-list">
+            <div class="gauge" data-kind="water">
+              <div class="gauge-head">
+                <span>Eau</span>
+                <strong></strong>
+              </div>
+              <div class="meter"><span></span></div>
+            </div>
+            <div class="gauge" data-kind="fertilizer">
+              <div class="gauge-head">
+                <span>Fertilisation</span>
+                <strong></strong>
+              </div>
+              <div class="meter"><span></span></div>
+            </div>
+          </div>
+
+          <div class="exposure-note"></div>
+          <p class="plant-hint"></p>
+
+          <div class="quick-actions">
+            <button class="water-button" type="button">J'ai arrose</button>
+            <button class="feed-button" type="button">J'ai fertilise</button>
+          </div>
+        </div>
+      </article>
+    </template>
+
+    <script src="./app.js?v=4" type="module"></script>
+  </body>
+</html>

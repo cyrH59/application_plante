@@ -1,0 +1,13 @@
+Bonjour, 
+
+axe d'amélioration de cette application : 
+
+- Pour la météo, faire quelque chose de plus esthétique. Aussi, il faut améliorer en utilisant une station météo local : indiquer combien il a plu les 24 dernières heures, 3 derniers jours, et 7 derniers jours. On peut imaginer un système 
+de graphiques plus esthétiques. 
+
+- Il faut pouvoir personnaliser la perte journalière. Il faut que cette perte soit accentuer ou ralenti par température, pareil pour les précipitatios mais sans doute tu gères ça. Tu as réglé les pourcentages de pertes pour les catégories de plantes, mais dans la réalité il faudrait gérer par plante, car certaines plantes du potager ont des besoins différents.
+La saison doit aussi influencer le besoin en eau.
+
+- J'aimerais pouvoir cliquer sur chaque plante, et pouvoir ajouter une nouvelle photos avec dates. 
+- Il faudrait pouvoir indiquer la date de naissance de la plante, et donner une indication sur son état de santé. Echelle de 1 à 10
+- Il faudrait un cimetière de plante aussi, avec une photo principale si on décide de mettre une plante au cimetière, on garde que une photo. 
