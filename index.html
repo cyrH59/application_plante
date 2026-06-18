@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>PlantCare</title>
     <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=4" />
+    <link rel="stylesheet" href="./styles.css?v=6" />
   </head>
   <body>
     <div class="app-shell">
@@ -24,6 +24,21 @@
       </header>
 
       <main>
+        <section class="account-band" id="accountBand">
+          <div>
+            <p class="label">Compte</p>
+            <strong id="accountSummary">Mode local</strong>
+            <p id="syncSummary">Connecte Supabase pour sauvegarder plantes et photos sur le serveur.</p>
+          </div>
+          <form class="account-form" id="accountForm">
+            <input id="accountEmail" type="email" autocomplete="email" placeholder="email" />
+            <input id="accountPassword" type="password" autocomplete="current-password" placeholder="mot de passe" />
+            <button class="ghost-button" id="signInBtn" type="submit">Connexion</button>
+            <button class="ghost-button" id="signUpBtn" type="button">Inscription</button>
+            <button class="ghost-button" id="signOutBtn" type="button" hidden>Sortir</button>
+          </form>
+        </section>
+
         <section class="weather-band" id="weatherBand">
           <div>
             <p class="label">Meteo locale</p>
@@ -81,6 +96,19 @@
           Photo
           <input id="plantPhoto" name="photo" type="file" accept="image/*" />
         </label>
+
+        <div class="form-grid">
+          <label>
+            Date de naissance
+            <input id="plantBirthDate" name="birthDate" type="date" />
+          </label>
+
+          <label>
+            Sante
+            <input id="plantHealthScore" name="healthScore" type="range" min="1" max="10" step="1" />
+            <span class="range-value" id="healthScoreValue">7/10</span>
+          </label>
+        </div>
 
         <div class="form-grid">
           <label>
@@ -217,6 +245,6 @@
       </article>
     </template>
 
-    <script src="./app.js?v=4" type="module"></script>
+    <script src="./app.js?v=6" type="module"></script>
   </body>
 </html>

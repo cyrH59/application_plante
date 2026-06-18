@@ -1,4 +1,4 @@
-import { supabaseConfig, isSupabaseConfigured } from "./supabase-config.js";
+import { supabaseConfig, isSupabaseConfigured } from "./supabase-config.js?v=6";
 
 const SUPABASE_CDN = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 

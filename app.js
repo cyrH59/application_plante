@@ -6,6 +6,21 @@ import {
   getWateringMetrics,
   getWeatherRisk
 } from "./src/engines.js?v=3";
+import { isSupabaseConfigured } from "./src/supabase-config.js?v=6";
+import {
+  deletePlant as deleteRemotePlant,
+  ensureDefaultGarden,
+  fromPlantRow,
+  getCurrentUser,
+  getPhotoUrl,
+  listPlants as listRemotePlants,
+  logPlantAction,
+  signInWithPassword,
+  signOut,
+  signUpWithPassword,
+  uploadPlantPhoto,
+  upsertPlant
+} from "./src/supabase-repository.js?v=6";
 
 const STORAGE_KEY = "plantcare.plants.v2";
 const LEGACY_STORAGE_KEY = "plantcare.plants.v1";
@@ -22,6 +37,10 @@ let plants = loadPlants();
 let weather = loadWeather();
 let activeFilter = "all";
 let installPrompt = null;
+let currentUser = null;
+let currentGarden = null;
+let syncMode = "local";
+let syncBusy = false;
 
 const dom = {
   plantList: document.querySelector("#plantList"),
@@ -31,12 +50,23 @@ const dom = {
   locationBtn: document.querySelector("#locationBtn"),
   openPlantFormBtn: document.querySelector("#openPlantFormBtn"),
   plantDialog: document.querySelector("#plantDialog"),
+  accountBand: document.querySelector("#accountBand"),
+  accountForm: document.querySelector("#accountForm"),
+  accountEmail: document.querySelector("#accountEmail"),
+  accountPassword: document.querySelector("#accountPassword"),
+  accountSummary: document.querySelector("#accountSummary"),
+  syncSummary: document.querySelector("#syncSummary"),
+  signUpBtn: document.querySelector("#signUpBtn"),
+  signOutBtn: document.querySelector("#signOutBtn"),
   closeDialogBtn: document.querySelector("#closeDialogBtn"),
   plantForm: document.querySelector("#plantForm"),
   dialogTitle: document.querySelector("#dialogTitle"),
   plantId: document.querySelector("#plantId"),
   plantName: document.querySelector("#plantName"),
   plantPhoto: document.querySelector("#plantPhoto"),
+  plantBirthDate: document.querySelector("#plantBirthDate"),
+  plantHealthScore: document.querySelector("#plantHealthScore"),
+  healthScoreValue: document.querySelector("#healthScoreValue"),
   plantCategory: document.querySelector("#plantCategory"),
   plantProfile: document.querySelector("#plantProfile"),
   plantLight: document.querySelector("#plantLight"),
@@ -59,6 +89,7 @@ const dom = {
 
 render();
 registerEvents();
+initializeCloudSync();
 registerServiceWorker();
 
 function registerEvents() {
@@ -79,13 +110,31 @@ function registerEvents() {
   dom.importInput.addEventListener("change", importData);
   dom.installBtn.addEventListener("click", installApp);
   dom.plantWaterLevel.addEventListener("input", updateWaterLevelLabel);
+  dom.plantHealthScore.addEventListener("input", updateHealthScoreLabel);
   dom.fertilizationMode.addEventListener("change", syncManualFertilizationVisibility);
+  dom.accountForm.addEventListener("submit", handleSignIn);
+  dom.signUpBtn.addEventListener("click", handleSignUp);
+  dom.signOutBtn.addEventListener("click", handleSignOut);
 
   window.addEventListener("beforeinstallprompt", (event) => {
     event.preventDefault();
     installPrompt = event;
     dom.installBtn.hidden = false;
   });
+}
+
+async function initializeCloudSync() {
+  renderAccount();
+  if (!isSupabaseConfigured()) return;
+
+  try {
+    currentUser = await getCurrentUser();
+    if (currentUser) await loadRemoteData();
+  } catch (error) {
+    setSyncMessage(`Supabase indisponible: ${error.message}`);
+  } finally {
+    renderAccount();
+  }
 }
 
 function loadPlants() {
@@ -119,6 +168,11 @@ function normalizePlant(plant) {
     lastWateredAt: plant.lastWateredAt || plant.createdAt || Date.now(),
     waterLevel: Number.isFinite(plant.waterLevel) ? plant.waterLevel : 100,
     lastFertilizedAt: plant.lastFertilizedAt || plant.createdAt || Date.now(),
+    birthDate: plant.birthDate || null,
+    healthScore: Number(plant.healthScore || 7),
+    status: plant.status || "active",
+    cemeteryDate: plant.cemeteryDate || null,
+    cemeteryReason: plant.cemeteryReason || null,
     fertilization: plant.fertilization || { mode: "auto", manualSchedule: getDefaultManualFertilization() },
     wateringOverride: plant.wateringOverride || null
   };
@@ -145,9 +199,28 @@ function saveWeather(nextWeather) {
 }
 
 function render() {
+  renderAccount();
   renderWeather();
   renderStatus();
   renderPlants();
+}
+
+function renderAccount() {
+  const configured = isSupabaseConfigured();
+  dom.accountBand.dataset.mode = syncMode;
+  dom.accountSummary.textContent = currentUser ? `Connecte: ${currentUser.email}` : configured ? "Supabase pret" : "Mode local";
+  if (!dom.syncSummary.dataset.custom) {
+    dom.syncSummary.textContent = currentUser
+      ? `Synchronisation serveur active${currentGarden ? ` · ${currentGarden.name}` : ""}.`
+      : configured
+        ? "Connecte-toi pour synchroniser plantes et photos."
+        : "Supabase n'est pas encore configure.";
+  }
+  dom.accountEmail.hidden = Boolean(currentUser);
+  dom.accountPassword.hidden = Boolean(currentUser);
+  dom.signOutBtn.hidden = !currentUser;
+  dom.accountForm.querySelector("#signInBtn").hidden = Boolean(currentUser);
+  dom.signUpBtn.hidden = Boolean(currentUser);
 }
 
 function renderWeather() {
@@ -199,7 +272,7 @@ function renderStatus() {
 }
 
 function renderPlants() {
-  const visiblePlants = plants.filter((plant) => activeFilter === "all" || plant.category === activeFilter);
+  const visiblePlants = plants.filter((plant) => plant.status !== "cemetery" && (activeFilter === "all" || plant.category === activeFilter));
   dom.plantList.innerHTML = "";
 
   if (visiblePlants.length === 0) {
@@ -240,6 +313,7 @@ function renderPlants() {
       setGauge(card, "water", water.value, water.state);
       setGauge(card, "fertilizer", fertilizer.value, fertilizer.state, fertilizer.label);
       renderExposureNote(card.querySelector(".exposure-note"), exposure);
+      card.dataset.health = plant.healthScore || 7;
 
       card.querySelector(".water-button").addEventListener("click", () => waterPlant(plant.id));
       card.querySelector(".feed-button").addEventListener("click", () => feedPlant(plant.id));
@@ -256,6 +330,7 @@ function getAlertLabel(state) {
 }
 
 function getHint(plant, water, fertilizer, exposure) {
+  if ((plant.healthScore || 7) <= 3) return `Sante ${plant.healthScore}/10: plante a surveiller de pres.`;
   if (water.state === "danger") return `Eau basse: ${water.value}%. Dernier arrosage il y a ${water.daysSinceWater} j.`;
   if (fertilizer.state === "danger") return `Fertilisation en retard de ${fertilizer.overdueDays} j.`;
   if (water.rainGain > 0) return `La pluie ajoute environ +${water.rainGain}% a la reserve d'eau.`;
@@ -289,6 +364,8 @@ function openForm(plant = null) {
   dom.deletePlantBtn.hidden = !plant;
   dom.plantWaterLevel.value = currentWater;
   updateWaterLevelLabel();
+  dom.plantHealthScore.value = plant?.healthScore || 7;
+  updateHealthScoreLabel();
 
   if (plant) {
     dom.plantName.value = plant.name;
@@ -296,6 +373,7 @@ function openForm(plant = null) {
     dom.plantProfile.value = plant.profile;
     dom.plantLight.value = plant.light;
     dom.plantPlacement.value = plant.placement;
+    dom.plantBirthDate.value = plant.birthDate || "";
     dom.plantNotes.value = plant.notes || "";
   }
 
@@ -314,7 +392,8 @@ async function savePlantFromForm(event) {
 
   const id = dom.plantId.value || crypto.randomUUID();
   const existing = plants.find((plant) => plant.id === id);
-  const photo = dom.plantPhoto.files[0] ? await fileToDataUrl(dom.plantPhoto.files[0]) : existing?.photo || "";
+  const photoFile = dom.plantPhoto.files[0] || null;
+  const localPhoto = photoFile ? await fileToDataUrl(photoFile) : existing?.photo || "";
   const now = Date.now();
   const waterLevel = Number(dom.plantWaterLevel.value);
   const nextPlant = {
@@ -325,7 +404,12 @@ async function savePlantFromForm(event) {
     light: dom.plantLight.value,
     placement: dom.plantPlacement.value,
     notes: dom.plantNotes.value.trim(),
-    photo,
+    photo: localPhoto,
+    birthDate: dom.plantBirthDate.value || null,
+    healthScore: Number(dom.plantHealthScore.value || 7),
+    status: existing?.status || "active",
+    cemeteryDate: existing?.cemeteryDate || null,
+    cemeteryReason: existing?.cemeteryReason || null,
     createdAt: existing?.createdAt || now,
     lastWateredAt: now,
     waterLevel,
@@ -337,31 +421,86 @@ async function savePlantFromForm(event) {
     wateringOverride: existing?.wateringOverride || null
   };
 
-  plants = existing ? plants.map((plant) => (plant.id === id ? nextPlant : plant)) : [nextPlant, ...plants];
-  savePlants();
-  closeForm();
-  render();
+  try {
+    setBusy(true);
+    if (currentGarden) {
+      await upsertPlant(currentGarden.id, nextPlant);
+      if (photoFile) {
+        const photoRow = await uploadPlantPhoto({
+          plantId: nextPlant.id,
+          file: photoFile,
+          takenAt: new Date().toISOString().slice(0, 10),
+          caption: "Photo principale"
+        });
+        await logPlantAction(nextPlant.id, "photo", { photoId: photoRow.id });
+      }
+      await loadRemoteData();
+      setSyncMessage("Plante sauvegardee sur Supabase.");
+    } else {
+      plants = existing ? plants.map((plant) => (plant.id === id ? nextPlant : plant)) : [nextPlant, ...plants];
+      savePlants();
+    }
+    closeForm();
+    render();
+  } catch (error) {
+    alert(`Sauvegarde impossible: ${error.message}`);
+  } finally {
+    setBusy(false);
+  }
 }
 
-function deleteCurrentPlant() {
+async function deleteCurrentPlant() {
   const id = dom.plantId.value;
   if (!id) return;
-  plants = plants.filter((plant) => plant.id !== id);
-  savePlants();
-  closeForm();
-  render();
+  try {
+    if (currentGarden) {
+      await deleteRemotePlant(id);
+      await loadRemoteData();
+    } else {
+      plants = plants.filter((plant) => plant.id !== id);
+      savePlants();
+    }
+    closeForm();
+    render();
+  } catch (error) {
+    alert(`Suppression impossible: ${error.message}`);
+  }
 }
 
-function waterPlant(id) {
-  plants = plants.map((plant) => (plant.id === id ? { ...plant, waterLevel: 100, lastWateredAt: Date.now() } : plant));
+async function waterPlant(id) {
+  const updatedAt = Date.now();
+  plants = plants.map((plant) => (plant.id === id ? { ...plant, waterLevel: 100, lastWateredAt: updatedAt } : plant));
   savePlants();
   render();
+  if (!currentGarden) return;
+
+  const plant = plants.find((item) => item.id === id);
+  if (!plant) return;
+  try {
+    await upsertPlant(currentGarden.id, plant);
+    await logPlantAction(id, "watering", { waterLevel: 100 });
+    setSyncMessage("Arrosage synchronise.");
+  } catch (error) {
+    setSyncMessage(`Arrosage local uniquement: ${error.message}`);
+  }
 }
 
-function feedPlant(id) {
-  plants = plants.map((plant) => (plant.id === id ? { ...plant, lastFertilizedAt: Date.now() } : plant));
+async function feedPlant(id) {
+  const updatedAt = Date.now();
+  plants = plants.map((plant) => (plant.id === id ? { ...plant, lastFertilizedAt: updatedAt } : plant));
   savePlants();
   render();
+  if (!currentGarden) return;
+
+  const plant = plants.find((item) => item.id === id);
+  if (!plant) return;
+  try {
+    await upsertPlant(currentGarden.id, plant);
+    await logPlantAction(id, "fertilization", {});
+    setSyncMessage("Fertilisation synchronisee.");
+  } catch (error) {
+    setSyncMessage(`Fertilisation locale uniquement: ${error.message}`);
+  }
 }
 
 async function requestWeather() {
@@ -509,8 +648,92 @@ function registerServiceWorker() {
   });
 }
 
+async function handleSignIn(event) {
+  event.preventDefault();
+  if (!dom.accountEmail.value || !dom.accountPassword.value) return;
+
+  try {
+    setBusy(true);
+    const { user } = await signInWithPassword(dom.accountEmail.value, dom.accountPassword.value);
+    currentUser = user;
+    await loadRemoteData();
+    setSyncMessage("Connexion reussie. Donnees serveur chargees.");
+    dom.accountPassword.value = "";
+    render();
+  } catch (error) {
+    alert(`Connexion impossible: ${error.message}`);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function handleSignUp() {
+  if (!dom.accountEmail.value || !dom.accountPassword.value) return;
+
+  try {
+    setBusy(true);
+    const { user } = await signUpWithPassword(dom.accountEmail.value, dom.accountPassword.value);
+    currentUser = user || (await getCurrentUser());
+    if (currentUser) await loadRemoteData();
+    setSyncMessage("Compte cree. Verifie tes emails si Supabase demande une confirmation.");
+    dom.accountPassword.value = "";
+    render();
+  } catch (error) {
+    alert(`Inscription impossible: ${error.message}`);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function handleSignOut() {
+  try {
+    await signOut();
+  } finally {
+    currentUser = null;
+    currentGarden = null;
+    syncMode = "local";
+    plants = loadPlants();
+    setSyncMessage("Deconnecte. Retour au mode local.");
+    render();
+  }
+}
+
+async function loadRemoteData() {
+  currentGarden = await ensureDefaultGarden();
+  if (!currentGarden) return;
+
+  const rows = await listRemotePlants(currentGarden.id);
+  const mapped = await Promise.all(
+    rows.map(async (row) => {
+      const primary = (row.plant_photos || []).find((photo) => photo.is_primary) || row.plant_photos?.[0];
+      const photoUrl = primary ? await getPhotoUrl(primary.storage_path) : "";
+      return normalizePlant(fromPlantRow(row, photoUrl));
+    })
+  );
+
+  plants = mapped;
+  savePlants();
+  syncMode = "cloud";
+}
+
+function setBusy(value) {
+  syncBusy = value;
+  dom.accountForm.querySelectorAll("button, input").forEach((node) => {
+    if (node.id !== "signOutBtn") node.disabled = value;
+  });
+}
+
+function setSyncMessage(message) {
+  dom.syncSummary.dataset.custom = "true";
+  dom.syncSummary.textContent = message;
+}
+
 function updateWaterLevelLabel() {
   dom.waterLevelValue.textContent = `${dom.plantWaterLevel.value}%`;
+}
+
+function updateHealthScoreLabel() {
+  dom.healthScoreValue.textContent = `${dom.plantHealthScore.value}/10`;
 }
 
 function syncManualFertilizationVisibility() {
